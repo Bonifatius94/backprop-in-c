@@ -35,3 +35,7 @@ sudo apt-get update && \
 ```sh
 ./train.sh
 ```
+
+```sh
+./benchmark.sh
+```
