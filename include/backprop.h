@@ -103,10 +103,11 @@ void zeros_like(const Matrix2D a1[1], Matrix2D res[1])
     res->num_cols = a1->num_cols;
     res->data = NULL;
 
+    int size = (int)(ceil((a1->num_rows * a1->num_cols) / 16.0)) * 16;
     if (a1->data != NULL)
-        res->data = (double*)calloc(sizeof(a1->data) / sizeof(double), sizeof(double));
+        res->data = (double*)calloc(size, sizeof(double));
     if (a1->cache != NULL)
-        res->cache = (double*)calloc(sizeof(a1->cache) / sizeof(double), sizeof(double));
+        res->cache = (double*)calloc(size, sizeof(double));
 }
 
 /* Initialize a pre-allocated matrix with the same data as the original. */
