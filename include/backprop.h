@@ -81,8 +81,6 @@ void zeros(Matrix2D a1[1], int num_rows, int num_cols)
     int size = (int)(ceil((num_rows * num_cols) / 16.0)) * 16;
     a1->data = (double*)calloc(size, sizeof(double));
     a1->cache = NULL;
-    /* info: allocate twice as much to make use of transpose caching in matmul()
-             and make sure the size is divisible by 16 to support 512-bit AVX2 ops */
 }
 
 /* Initialize an unallocated matrix with zeros according to the shape.
@@ -94,8 +92,8 @@ void zeros_with_cache(Matrix2D a1[1], int num_rows, int num_cols)
     int size = (int)(ceil((num_rows * num_cols) / 16.0)) * 16;
     a1->data = (double*)calloc(size, sizeof(double));
     a1->cache = (double*)calloc(size, sizeof(double));
-    /* info: allocate twice as much to make use of transpose caching in matmul()
-             and make sure the size is divisible by 16 to support 512-bit AVX2 ops */
+    /* info: allocate twice as much to make use of transpose caching in matmul(),
+             align to 16-byte memory layout to support 512-bit AVX2 ops */
 }
 
 /* Initialize an unallocated matrix with zeros according to the original's shape. */
@@ -106,12 +104,9 @@ void zeros_like(const Matrix2D a1[1], Matrix2D res[1])
     res->data = NULL;
 
     if (a1->data != NULL)
-    {
-        int size = (int)(ceil((res->num_rows * res->num_cols) / 16.0)) * 16;
-        res->data = (double*)calloc(2 * res->num_rows * res->num_cols, sizeof(double));
-        /* info: allocate twice as much to make use of transpose caching in matmul()
-                 and make sure the size is divisible by 16 to support 512-bit AVX2 ops */
-    }
+        res->data = (double*)calloc(sizeof(a1->data) / sizeof(double), sizeof(double));
+    if (a1->cache != NULL)
+        res->cache = (double*)calloc(sizeof(a1->cache) / sizeof(double), sizeof(double));
 }
 
 /* Initialize a pre-allocated matrix with the same data as the original. */
