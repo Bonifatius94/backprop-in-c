@@ -11,13 +11,13 @@
 /*     RANDOM OPERATIONS     */
 /* ========================= */
 
-/* generate a uniform random double between [0, 1]. */
+/* Generate a uniform random double between [0, 1]. */
 double random_uniform_double()
 {
     return (double)rand() / RAND_MAX;
 }
 
-/* generate a uniform random integer between [0, n-1]. */
+/* Generate a uniform random integer between [0, n-1]. */
 int random_int(int n)
 {
     return ((int)(random_uniform_double() * n)) % n;
@@ -41,6 +41,7 @@ double random_normal_double(double center, double std_dev)
         return mag * sin(two_pi * u2) + center;
 }
 
+/* Shuffle a pre-initialized permutation with Fisher-Yates. */
 void permutate(int perm[], int len)
 {
     for (int i = len - 1; i > 0; i--)
@@ -60,6 +61,7 @@ void permutate(int perm[], int len)
 /*     MATRIX OPERATIONS     */
 /* ========================= */
 
+/* 2D matrix with a given amount of rows and columns. */
 typedef struct Matrix2D {
     int num_rows;
     int num_cols;
@@ -67,8 +69,11 @@ typedef struct Matrix2D {
     double* cache;
 } Matrix2D;
 
+/* Assign an empty matrix. */
 #define EMPTY_MATRIX ((Matrix2D){0, 0, NULL, NULL})
 
+/* Flags for matrix multiplication, indicating whether
+   input matrices need to be viewed as transposed. */
 typedef enum MatmulFlags {
     MATMUL_NN, MATMUL_TN, MATMUL_NT, MATMUL_TT
 } MatmulFlags;
@@ -124,6 +129,7 @@ void random_normal(Matrix2D res[1], double center, double std_dev)
         res->data[i] = random_normal_double(center, std_dev);
 }
 
+/* Compute the dot product of two line vectors. */
 double dot_product(Matrix2D v1[1], Matrix2D v2[1])
 {
     assert(v1->num_rows == 1 && v2->num_rows == 1);
@@ -136,6 +142,7 @@ double dot_product(Matrix2D v1[1], Matrix2D v2[1])
     return sum;
 }
 
+/* Transpose the given matrix a1 and write the result to res. */
 void transpose(const Matrix2D a1[1], Matrix2D res[1])
 {
     assert(a1->num_rows == res->num_cols);
@@ -189,6 +196,7 @@ void matmul(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1], MatmulF
     }
 }
 
+/* Elementwise add two matrices a1, a2 and write the result to res. */
 void elemsum(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
 {
     assert(a1->num_rows == a2->num_rows);
@@ -201,6 +209,7 @@ void elemsum(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
         res->data[i] = a1->data[i] + a2->data[i];
 }
 
+/* Elementwise subtract matrix a2 from a1 and write the result to res. */
 void elemdiff(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
 {
     assert(a1->num_rows == a2->num_rows);
@@ -213,6 +222,7 @@ void elemdiff(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
         res->data[i] = a1->data[i] - a2->data[i];
 }
 
+/* Elementwise multiply two matrices a1, a2 and write the result to res. */
 void elemmul(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
 {
     assert(a1->num_rows == a2->num_rows);
@@ -225,6 +235,7 @@ void elemmul(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
         res->data[i] = a1->data[i] * a2->data[i];
 }
 
+/* Elementwise divide matrix a1 by a2 and write the result to res. */
 void elemdiv(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
 {
     assert(a1->num_rows == a2->num_rows);
@@ -237,6 +248,7 @@ void elemdiv(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
         res->data[i] = a1->data[i] / a2->data[i];
 }
 
+/* Add the row vector to each row of the matrix a1 and write the result to res. */
 void batch_rowadd(const Matrix2D a1[1], const Matrix2D row_vec[1], Matrix2D res[1])
 {
     assert(a1->num_cols == row_vec->num_cols);
@@ -255,6 +267,7 @@ void batch_rowadd(const Matrix2D a1[1], const Matrix2D row_vec[1], Matrix2D res[
     }
 }
 
+/* Aggregate the mean of each column of a1 and write the result to res. */
 void batch_colmean(const Matrix2D a1[1], Matrix2D res[1])
 {
     assert(a1->num_cols == res->num_cols);
@@ -270,6 +283,7 @@ void batch_colmean(const Matrix2D a1[1], Matrix2D res[1])
     }
 }
 
+/* Add a single value to all elements in matrix a1 and write the result to res. */
 void batch_sum(const Matrix2D a1[1], double summand, Matrix2D res[1])
 {
     assert(a1->num_rows == res->num_rows);
@@ -280,11 +294,13 @@ void batch_sum(const Matrix2D a1[1], double summand, Matrix2D res[1])
         res->data[i] = a1->data[i] + summand;
 }
 
+/* Subtract a single value from all elements in matrix a1 and write the result to res. */
 void batch_diff(const Matrix2D a1[1], double diff, Matrix2D res[1])
 {
     batch_sum(a1, -diff, res);
 }
 
+/* Multiply all elements in matrix a1 by a single value and write the result to res. */
 void batch_mul(const Matrix2D a1[1], double factor, Matrix2D res[1])
 {
     assert(a1->num_rows == res->num_rows);
@@ -295,6 +311,7 @@ void batch_mul(const Matrix2D a1[1], double factor, Matrix2D res[1])
         res->data[i] = a1->data[i] * factor;
 }
 
+/* Divide all elements in matrix a1 by a single value and write the result to res. */
 void batch_div(const Matrix2D a1[1], double factor, Matrix2D res[1])
 {
     assert(factor != 0.0);
@@ -302,6 +319,7 @@ void batch_div(const Matrix2D a1[1], double factor, Matrix2D res[1])
     batch_mul(a1, factor, res);
 }
 
+/* Compute the sqrt() of all elements in matrix a1 and write the result to res. */
 void batch_sqrt(const Matrix2D a1[1], Matrix2D res[1])
 {
     assert(a1->num_rows == res->num_rows);
@@ -312,6 +330,7 @@ void batch_sqrt(const Matrix2D a1[1], Matrix2D res[1])
         res->data[i] = sqrt(a1->data[i]);
 }
 
+/* Cap all elements in matrix a1 by a minimum value and write the result to res. */
 void batch_max(const Matrix2D a1[1], double min, Matrix2D res[1])
 {
     assert(a1->num_rows == res->num_rows);
@@ -322,21 +341,18 @@ void batch_max(const Matrix2D a1[1], double min, Matrix2D res[1])
         res->data[i] = a1->data[i] >= min ? a1->data[i] : min;
 }
 
+/* Indicate for all elements in matrix a1 whether the value is greater of equal
+   than a given minimum value and write the result to res. */
 void batch_geq(const Matrix2D a1[1], double min, Matrix2D res[1])
 {
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
-    for (int row = 0; row < a1->num_rows; row++)
-    {
-        for (int col = 0; col < a1->num_cols; col++)
-        {
-            int i = row * a1->num_cols + col;
-            res->data[i] = a1->data[i] >= min ? 1.0 : 0.0;
-        }
-    }
+    for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
+        res->data[i] = a1->data[i] >= min ? 1.0 : 0.0;
 }
 
+/* Shuffle the rows according to the given permutation (in-place). */
 void shuffle_rows(Matrix2D a1[1], const int perm[])
 {
     double temp_data[a1->num_rows * a1->num_cols];
@@ -350,6 +366,7 @@ void shuffle_rows(Matrix2D a1[1], const int perm[])
             a1->data[i * a1->num_cols + j] = temp_data[i * a1->num_cols + j];
 }
 
+/* Free the data managed by the matrix. */
 void free_matrix(Matrix2D a1[1])
 {
     if (a1->data != NULL)
