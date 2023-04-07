@@ -6,8 +6,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # set(CMAKE_C_FLAGS "-Wall -Wextra")
-set(CMAKE_C_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS_DEBUG "-g -march=native -mavx2")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native -mavx2")
 
 add_subdirectory(test)
 enable_testing()

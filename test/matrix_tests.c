@@ -59,6 +59,27 @@ void test_matmul_with_identity_matrix_is_same_matrix()
     free_matrix(res);
 }
 
+void test_matmul_with_identity_matrix_is_same_matrix_bigger_matrix()
+{
+    Matrix2D a[1], id[1], res[1];
+    zeros_with_cache(id, 63, 63);
+    for (int i = 0; i < 63; i++)
+        id->data[i * 63 + i] = 1.0;
+
+    zeros_with_cache(a, 63, 63);
+    random_normal(a, 0.0, 1.0);
+
+    zeros_with_cache(res, 63, 63);
+    matmul(a, id, res, MATMUL_NN);
+
+    for (int i = 0; i < 63 * 63; i++)
+        assert(a->data[i] == res->data[i]);
+
+    free_matrix(a);
+    free_matrix(id);
+    free_matrix(res);
+}
+
 void test_matmul_different_input_shapes_no_transpose()
 {
     Matrix2D a1[1], a2[1], res[1];
@@ -484,6 +505,7 @@ int main(int argc, char** argv)
     test_transpose_with_different_shape_dims();
     test_transpose_of_transpose_is_identity();
     test_matmul_with_identity_matrix_is_same_matrix();
+    test_matmul_with_identity_matrix_is_same_matrix_bigger_matrix();
     test_matmul_different_input_shapes_no_transpose();
     test_matmul_first_transposed();
     test_matmul_second_transposed();

@@ -6,6 +6,10 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
+#include <immintrin.h>
+
+// #define MATMUL_AVX512 1
+#define MATMUL_AVX256 1
 
 /* ========================= */
 /*     RANDOM OPERATIONS     */
@@ -78,12 +82,21 @@ typedef enum MatmulFlags {
     MATMUL_NN, MATMUL_TN, MATMUL_NT, MATMUL_TT
 } MatmulFlags;
 
+#if MATMUL_AVX512
+    #define ALIGN_BYTES 64
+#elif MATMUL_AVX256
+    #define ALIGN_BYTES 32
+#else
+    #define ALIGN_BYTES 1
+#endif
+#define align_to_register(n) ((int)(ceil((n) / (double)ALIGN_BYTES)) * ALIGN_BYTES)
+
 /* Initialize an unallocated matrix with zeros according to the shape. */
 void zeros(Matrix2D a1[1], int num_rows, int num_cols)
 {
     a1->num_rows = num_rows;
     a1->num_cols = num_cols;
-    int size = (int)(ceil((num_rows * num_cols) / 16.0)) * 16;
+    int size = align_to_register(num_rows * num_cols);
     a1->data = (double*)calloc(size, sizeof(double));
     a1->cache = NULL;
 }
@@ -94,7 +107,7 @@ void zeros_with_cache(Matrix2D a1[1], int num_rows, int num_cols)
 {
     a1->num_rows = num_rows;
     a1->num_cols = num_cols;
-    int size = (int)(ceil((num_rows * num_cols) / 16.0)) * 16;
+    int size = align_to_register(num_rows * num_cols);
     a1->data = (double*)calloc(size, sizeof(double));
     a1->cache = (double*)calloc(size, sizeof(double));
     /* info: allocate twice as much to make use of transpose caching in matmul(),
@@ -108,7 +121,7 @@ void zeros_like(const Matrix2D a1[1], Matrix2D res[1])
     res->num_cols = a1->num_cols;
     res->data = NULL;
 
-    int size = (int)(ceil((a1->num_rows * a1->num_cols) / 16.0)) * 16;
+    int size = align_to_register(a1->num_rows * a1->num_cols);
     if (a1->data != NULL)
         res->data = (double*)calloc(size, sizeof(double));
     if (a1->cache != NULL)
@@ -135,11 +148,60 @@ double dot_product(Matrix2D v1[1], Matrix2D v2[1])
     assert(v1->num_rows == 1 && v2->num_rows == 1);
     assert(v1->num_cols == v2->num_cols);
 
-    /* TODO: use SIMD to speed this up */
+#if MATMUL_AVX512
+
+    /* compute packed madd ops with 256-bit SIMD */
+    int i = 0;
+    __m512d sum = _mm512_setzero_pd();
+    for (; i < v1->num_cols / 8 * 8; i += 8)
+    {
+        __m512d a_vec = _mm512_loadu_pd(&v1->data[i]);
+        __m512d b_vec = _mm512_loadu_pd(&v2->data[i]);
+        sum = _mm512_fmadd_pd(a_vec, b_vec, sum);
+        /* madd := a * b + c */
+    }
+
+    /* unroll remainder not aligned with 8 doubles */
+    double result = 0;
+    for (; i < v1->num_cols; i++)
+        result += v1->data[i] * v2->data[i];
+
+    /* collect results as sum */
+    for (i = 0; i < 8; ++i)
+        result += ((double*)&sum)[i];
+    return result;
+
+#elif MATMUL_AVX256
+
+    /* compute packed madd ops with 256-bit SIMD */
+    int i = 0;
+    __m256d sum = _mm256_setzero_pd();
+    for (; i < v1->num_cols / 4 * 4; i += 4)
+    {
+        __m256d a_vec = _mm256_loadu_pd(&v1->data[i]);
+        __m256d b_vec = _mm256_loadu_pd(&v2->data[i]);
+        sum = _mm256_fmadd_pd(a_vec, b_vec, sum);
+        /* madd := a * b + c */
+    }
+
+    /* unroll remainder not aligned with 4 doubles */
+    double result = 0;
+    for (; i < v1->num_cols; i++)
+        result += v1->data[i] * v2->data[i];
+
+    /* collect results as sum */
+    for (i = 0; i < 4; ++i)
+        result += ((double*)&sum)[i];
+    return result;
+
+#else /* unoptimized version */
+
     double sum = 0.0;
     for (int i = 0; i < v1->num_cols; i++)
         sum += v1->data[i] * v2->data[i];
     return sum;
+
+#endif
 }
 
 /* Transpose the given matrix a1 and write the result to res. */
