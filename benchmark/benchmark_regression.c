@@ -5,7 +5,7 @@
 void create_dataset(Matrix2D features[1], Matrix2D labels[1])
 {
     double min_x = -10.0, max_x = 10.0;
-    int n_examples = 10001;
+    int n_examples = 10000;
     double step = (max_x - min_x) / n_examples;
 
     zeros(features, n_examples, 1);

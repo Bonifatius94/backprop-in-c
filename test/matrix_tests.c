@@ -1,17 +1,54 @@
 #include <assert.h>
 #include "backprop.h"
 
+void test_transpose_with_different_shape_dims()
+{
+    Matrix2D a[1], res[1];
+    zeros_with_cache(a, 2, 3);
+    zeros_with_cache(res, 3, 2);
+    for (int i = 0; i < 6; i++)
+        a->data[i] = i;
+
+    transpose(a, res);
+
+    double exp[] = { 0, 3, 1, 4, 2, 5 };
+    for (int i = 0; i < 6; i++)
+        assert(res->data[i] == exp[i]);
+
+    free_matrix(a);
+    free_matrix(res);
+}
+
+void test_transpose_of_transpose_is_identity()
+{
+    Matrix2D a[1], res[1], id[2];
+    zeros_with_cache(a, 2, 3);
+    zeros_with_cache(res, 3, 2);
+    zeros_with_cache(id, 2, 3);
+    random_normal(a, 0.0, 1.0);
+
+    transpose(a, res);
+    transpose(res, id);
+
+    for (int i = 0; i < 6; i++)
+        assert(id->data[i] == a->data[i]);
+
+    free_matrix(a);
+    free_matrix(res);
+    free_matrix(id);
+}
+
 void test_matmul_with_identity_matrix_is_same_matrix()
 {
     Matrix2D a[1], id[1], res[1];
-    zeros(id, 2, 2);
+    zeros_with_cache(id, 2, 2);
     id->data[0] = 1.0;
     id->data[3] = 1.0;
 
-    zeros(a, 2, 2);
+    zeros_with_cache(a, 2, 2);
     random_normal(a, 0.0, 1.0);
 
-    zeros(res, 2, 2);
+    zeros_with_cache(res, 2, 2);
     matmul(a, id, res, MATMUL_NN);
 
     for (int i = 0; i < 4; i++)
@@ -22,13 +59,16 @@ void test_matmul_with_identity_matrix_is_same_matrix()
     free_matrix(res);
 }
 
-void test_matmul_different_input_shapes()
+void test_matmul_different_input_shapes_no_transpose()
 {
-    double data[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
     Matrix2D a1[1], a2[1], res[1];
-    *a1 = (Matrix2D){ 2, 3, data };
-    *a2 = (Matrix2D){ 3, 4, data };
-    zeros(res, 2, 4);
+    zeros_with_cache(a1, 2, 3);
+    zeros_with_cache(a2, 3, 4);
+    zeros_with_cache(res, 2, 4);
+    for (int i = 0; i < 6; i++)
+        a1->data[i] = i;
+    for (int i = 0; i < 12; i++)
+        a2->data[i] = i;
 
     matmul(a1, a2, res, MATMUL_NN);
 
@@ -36,6 +76,8 @@ void test_matmul_different_input_shapes()
     for (int i = 0; i < 8; i++)
         assert(res->data[i] == exp[i]);
 
+    free_matrix(a1);
+    free_matrix(a2);
     free_matrix(res);
 }
 
@@ -44,9 +86,13 @@ void test_matmul_first_transposed()
     double data1[] = { 0, 3, 1, 4, 2, 5 };
     double data2[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
     Matrix2D a1[1], a2[1], res[1];
-    *a1 = (Matrix2D){ 3, 2, data1 };
-    *a2 = (Matrix2D){ 3, 4, data2 };
-    zeros(res, 2, 4);
+    zeros_with_cache(a1, 3, 2);
+    zeros_with_cache(a2, 3, 4);
+    zeros_with_cache(res, 2, 4);
+    for (int i = 0; i < 6; i++)
+        a1->data[i] = data1[i];
+    for (int i = 0; i < 12; i++)
+        a2->data[i] = data2[i];
 
     matmul(a1, a2, res, MATMUL_TN);
 
@@ -54,6 +100,8 @@ void test_matmul_first_transposed()
     for (int i = 0; i < 8; i++)
         assert(res->data[i] == exp[i]);
 
+    free_matrix(a1);
+    free_matrix(a2);
     free_matrix(res);
 }
 
@@ -62,9 +110,13 @@ void test_matmul_second_transposed()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     double data2[] = { 0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11 };
     Matrix2D a1[1], a2[1], res[1];
-    *a1 = (Matrix2D){ 2, 3, data1 };
-    *a2 = (Matrix2D){ 4, 3, data2 };
-    zeros(res, 2, 4);
+    zeros_with_cache(a1, 2, 3);
+    zeros_with_cache(a2, 4, 3);
+    zeros_with_cache(res, 2, 4);
+    for (int i = 0; i < 6; i++)
+        a1->data[i] = data1[i];
+    for (int i = 0; i < 12; i++)
+        a2->data[i] = data2[i];
 
     matmul(a1, a2, res, MATMUL_NT);
 
@@ -72,6 +124,8 @@ void test_matmul_second_transposed()
     for (int i = 0; i < 8; i++)
         assert(res->data[i] == exp[i]);
 
+    free_matrix(a1);
+    free_matrix(a2);
     free_matrix(res);
 }
 
@@ -80,9 +134,13 @@ void test_matmul_both_transposed()
     double data1[] = { 0, 3, 1, 4, 2, 5 };
     double data2[] = { 0, 4, 8, 1, 5, 9, 2, 6, 10, 3, 7, 11 };
     Matrix2D a1[1], a2[1], res[1];
-    *a1 = (Matrix2D){ 3, 2, data1 };
-    *a2 = (Matrix2D){ 4, 3, data2 };
-    zeros(res, 2, 4);
+    zeros_with_cache(a1, 3, 2);
+    zeros_with_cache(a2, 4, 3);
+    zeros_with_cache(res, 2, 4);
+    for (int i = 0; i < 6; i++)
+        a1->data[i] = data1[i];
+    for (int i = 0; i < 12; i++)
+        a2->data[i] = data2[i];
 
     matmul(a1, a2, res, MATMUL_TT);
 
@@ -90,6 +148,8 @@ void test_matmul_both_transposed()
     for (int i = 0; i < 8; i++)
         assert(res->data[i] == exp[i]);
 
+    free_matrix(a1);
+    free_matrix(a2);
     free_matrix(res);
 }
 
@@ -100,7 +160,7 @@ void test_elemmul()
     Matrix2D a1[1], a2[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
     *a2 = (Matrix2D){ 3, 2, data2 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     elemmul(a1, a2, res);
 
@@ -118,7 +178,7 @@ void test_elemdiv()
     Matrix2D a1[1], a2[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
     *a2 = (Matrix2D){ 3, 2, data2 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     elemdiv(a1, a2, res);
 
@@ -136,7 +196,7 @@ void test_elemsum()
     Matrix2D a1[1], a2[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
     *a2 = (Matrix2D){ 3, 2, data2 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     elemsum(a1, a2, res);
 
@@ -154,7 +214,7 @@ void test_elemdiff()
     Matrix2D a1[1], a2[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
     *a2 = (Matrix2D){ 3, 2, data2 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     elemdiff(a1, a2, res);
 
@@ -172,7 +232,7 @@ void test_batch_rowadd()
     Matrix2D a1[1], a2[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
     *a2 = (Matrix2D){ 1, 2, data2 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_rowadd(a1, a2, res);
 
@@ -188,7 +248,7 @@ void test_batch_colmean()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 1, 2);
+    zeros_with_cache(res, 1, 2);
 
     batch_colmean(a1, res);
 
@@ -204,7 +264,7 @@ void test_batch_sum()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_sum(a1, 2, res);
 
@@ -220,7 +280,7 @@ void test_batch_diff()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_diff(a1, -2, res);
 
@@ -236,7 +296,7 @@ void test_batch_mul()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_mul(a1, 2, res);
 
@@ -252,7 +312,7 @@ void test_batch_div()
     double data1[] = { 2, 4, 6, 8, 10, 12 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_div(a1, 2, res);
 
@@ -268,7 +328,7 @@ void test_batch_sqrt()
     double data1[] = { 1, 4, 9, 16, 25, 36 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_sqrt(a1, res);
 
@@ -284,7 +344,7 @@ void test_batch_max()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_max(a1, 2, res);
 
@@ -300,7 +360,7 @@ void test_batch_geq()
     double data1[] = { 0, 1, 2, 3, 4, 5 };
     Matrix2D a1[1], res[1];
     *a1 = (Matrix2D){ 3, 2, data1 };
-    zeros(res, 3, 2);
+    zeros_with_cache(res, 3, 2);
 
     batch_geq(a1, 2, res);
 
@@ -374,8 +434,8 @@ void test_shuffle_by_generated_permutations()
 {
     int num_rows = 1000, num_cols = 10;
     Matrix2D data, data_old;
-    zeros(&data, num_rows, num_cols);
-    zeros(&data_old, num_rows, num_cols);
+    zeros_with_cache(&data, num_rows, num_cols);
+    zeros_with_cache(&data_old, num_rows, num_cols);
     random_normal(&data, 0.0, 1.0);
 
     int perm[num_rows];
@@ -401,7 +461,7 @@ void test_rand_normal_matrix_init()
 {
     double exp_sigma = 1.0, exp_mu = 1.0;
     Matrix2D data;
-    zeros(&data, 1000, 10);
+    zeros_with_cache(&data, 1000, 10);
     random_normal(&data, exp_mu, exp_sigma);
 
     double mu = 0.0;
@@ -421,8 +481,10 @@ void test_rand_normal_matrix_init()
 
 int main(int argc, char** argv)
 {
+    test_transpose_with_different_shape_dims();
+    test_transpose_of_transpose_is_identity();
     test_matmul_with_identity_matrix_is_same_matrix();
-    test_matmul_different_input_shapes();
+    test_matmul_different_input_shapes_no_transpose();
     test_matmul_first_transposed();
     test_matmul_second_transposed();
     test_matmul_both_transposed();

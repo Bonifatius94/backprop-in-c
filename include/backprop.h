@@ -64,9 +64,10 @@ typedef struct Matrix2D {
     int num_rows;
     int num_cols;
     double* data;
+    double* cache;
 } Matrix2D;
 
-#define EMPTY_MATRIX ((Matrix2D){0, 0, NULL})
+#define EMPTY_MATRIX ((Matrix2D){0, 0, NULL, NULL})
 
 typedef enum MatmulFlags {
     MATMUL_NN, MATMUL_TN, MATMUL_NT, MATMUL_TT
@@ -77,7 +78,24 @@ void zeros(Matrix2D a1[1], int num_rows, int num_cols)
 {
     a1->num_rows = num_rows;
     a1->num_cols = num_cols;
-    a1->data = (double*)calloc(num_rows * num_cols, sizeof(double));
+    int size = (int)(ceil((num_rows * num_cols) / 16.0)) * 16;
+    a1->data = (double*)calloc(size, sizeof(double));
+    a1->cache = NULL;
+    /* info: allocate twice as much to make use of transpose caching in matmul()
+             and make sure the size is divisible by 16 to support 512-bit AVX2 ops */
+}
+
+/* Initialize an unallocated matrix with zeros according to the shape.
+   Moreover, initialize an equally sized cache for faster matrix ops. */
+void zeros_with_cache(Matrix2D a1[1], int num_rows, int num_cols)
+{
+    a1->num_rows = num_rows;
+    a1->num_cols = num_cols;
+    int size = (int)(ceil((num_rows * num_cols) / 16.0)) * 16;
+    a1->data = (double*)calloc(size, sizeof(double));
+    a1->cache = (double*)calloc(size, sizeof(double));
+    /* info: allocate twice as much to make use of transpose caching in matmul()
+             and make sure the size is divisible by 16 to support 512-bit AVX2 ops */
 }
 
 /* Initialize an unallocated matrix with zeros according to the original's shape. */
@@ -88,7 +106,12 @@ void zeros_like(const Matrix2D a1[1], Matrix2D res[1])
     res->data = NULL;
 
     if (a1->data != NULL)
-        res->data = (double*)calloc(res->num_rows * res->num_cols, sizeof(double));
+    {
+        int size = (int)(ceil((res->num_rows * res->num_cols) / 16.0)) * 16;
+        res->data = (double*)calloc(2 * res->num_rows * res->num_cols, sizeof(double));
+        /* info: allocate twice as much to make use of transpose caching in matmul()
+                 and make sure the size is divisible by 16 to support 512-bit AVX2 ops */
+    }
 }
 
 /* Initialize a pre-allocated matrix with the same data as the original. */
@@ -105,6 +128,28 @@ void random_normal(Matrix2D res[1], double center, double std_dev)
         res->data[i] = random_normal_double(center, std_dev);
 }
 
+double dot_product(Matrix2D v1[1], Matrix2D v2[1])
+{
+    assert(v1->num_rows == 1 && v2->num_rows == 1);
+    assert(v1->num_cols == v2->num_cols);
+
+    /* TODO: use SIMD to speed this up */
+    double sum = 0.0;
+    for (int i = 0; i < v1->num_cols; i++)
+        sum += v1->data[i] * v2->data[i];
+    return sum;
+}
+
+void transpose(const Matrix2D a1[1], Matrix2D res[1])
+{
+    assert(a1->num_rows == res->num_cols);
+    assert(a1->num_cols == res->num_rows);
+    for (int i = 0; i < a1->num_rows; i++)
+        for (int j = 0; j < a1->num_cols; j++)
+            res->data[j * a1->num_rows + i] = a1->data[i * a1->num_cols + j];
+    /* TODO: think of implementing a faster transpose */
+}
+
 /* Multiply two matrices, write the result in a third matrix.
    Input matrices are assumed as transposed according to the flags. */
 void matmul(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1], MatmulFlags flags)
@@ -118,19 +163,33 @@ void matmul(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1], MatmulF
     assert(res->num_rows == l && res->num_cols == n && m == m2);
     /* matrix shapes: (l, m) x (m, n) = (l, n) */
 
+    /* transpose matrices into row layout */
+    Matrix2D a1_rl = (Matrix2D){l, m, a1->cache, NULL};
+    Matrix2D a2_rl = (Matrix2D){n, m, a2->cache, NULL};
+    if (!a1_normal)
+        transpose(a1, &a1_rl);
+    else
+        a1_rl.data = a1->data;
+    if (a2_normal)
+        transpose(a2, &a2_rl);
+    else
+        a2_rl.data = a2->data;
+    a1_rl.num_rows = 1;
+    a2_rl.num_rows = 1;
+
     for (int i = 0; i < l; i++)
     {
+        double* a2_rl_data = a2_rl.data;
+
         for (int j = 0; j < n; j++)
         {
-            double sum = 0.0;
-            for (int k = 0; k < m; k++)
-            {
-                int a1_ik = a1_normal ? i * m + k : k * l + i;
-                int a2_kj = a2_normal ? k * n + j : j * m + k;
-                sum += a1->data[a1_ik] * a2->data[a2_kj];
-            }
-            res->data[i * n + j] = sum;
+            double prod = dot_product(&a1_rl, &a2_rl);
+            res->data[i * n + j] = prod;
+            a2_rl.data += m;
         }
+
+        a1_rl.data += m;
+        a2_rl.data = a2_rl_data;
     }
 }
 
@@ -141,6 +200,7 @@ void elemsum(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = a1->data[i] + a2->data[i];
 }
@@ -152,6 +212,7 @@ void elemdiff(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = a1->data[i] - a2->data[i];
 }
@@ -163,6 +224,7 @@ void elemmul(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = a1->data[i] * a2->data[i];
 }
@@ -174,6 +236,7 @@ void elemdiv(const Matrix2D a1[1], const Matrix2D a2[1], Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = a1->data[i] / a2->data[i];
 }
@@ -184,6 +247,7 @@ void batch_rowadd(const Matrix2D a1[1], const Matrix2D row_vec[1], Matrix2D res[
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     int i = 0;
     for (int row = 0; row < a1->num_rows; row++)
     {
@@ -200,6 +264,7 @@ void batch_colmean(const Matrix2D a1[1], Matrix2D res[1])
     assert(a1->num_cols == res->num_cols);
     assert(res->num_rows == 1);
 
+    /* TODO: use SIMD to speed this up */
     for (int col = 0; col < a1->num_cols; col++)
     {
         double colsum = 0.0;
@@ -214,6 +279,7 @@ void batch_sum(const Matrix2D a1[1], double summand, Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = a1->data[i] + summand;
 }
@@ -228,6 +294,7 @@ void batch_mul(const Matrix2D a1[1], double factor, Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = a1->data[i] * factor;
 }
@@ -244,6 +311,7 @@ void batch_sqrt(const Matrix2D a1[1], Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
+    /* TODO: use SIMD to speed this up */
     for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
         res->data[i] = sqrt(a1->data[i]);
 }
@@ -253,14 +321,9 @@ void batch_max(const Matrix2D a1[1], double min, Matrix2D res[1])
     assert(a1->num_rows == res->num_rows);
     assert(a1->num_cols == res->num_cols);
 
-    for (int row = 0; row < a1->num_rows; row++)
-    {
-        for (int col = 0; col < a1->num_cols; col++)
-        {
-            int i = row * a1->num_cols + col;
-            res->data[i] = a1->data[i] >= min ? a1->data[i] : min;
-        }
-    }
+    /* TODO: use SIMD to speed this up */
+    for (int i = 0; i < a1->num_rows * a1->num_cols; i++)
+        res->data[i] = a1->data[i] >= min ? a1->data[i] : min;
 }
 
 void batch_geq(const Matrix2D a1[1], double min, Matrix2D res[1])
@@ -295,6 +358,8 @@ void free_matrix(Matrix2D a1[1])
 {
     if (a1->data != NULL)
         free(a1->data);
+    if (a1->cache != NULL)
+        free(a1->cache);
 }
 
 /* ========================= */
@@ -341,13 +406,13 @@ void dense_unpack_grads(const DenseLayer layer[1], const Matrix2D flat_grads[1],
     grads[1] = (Matrix2D){1, layer->output_dims, flat_grads->data + offset};
 }
 
-void dense_forward(const DenseLayer layer[1], FFLayerCache cache[1])
+void dense_forward(const DenseLayer layer[1], const FFLayerCache cache[1])
 {
     matmul(cache->inputs, layer->weights, cache->outputs, MATMUL_NN);
     batch_rowadd(cache->outputs, layer->biases, cache->outputs);
 }
 
-void dense_backward(const DenseLayer layer[1], FFLayerCache cache[1])
+void dense_backward(const DenseLayer layer[1], const FFLayerCache cache[1])
 {
     Matrix2D dense_grads[2];
     dense_unpack_grads(layer, cache->gradients, dense_grads);
@@ -441,8 +506,8 @@ void compile_model(FFModel model[1], int feature_dims, int batch_size)
         {
             DenseLayer* layer = (DenseLayer*)abs_layer;
             layer->input_dims = input_dims;
-            zeros(layer->weights, layer->input_dims, layer->output_dims);
-            zeros(layer->biases, 1, layer->output_dims);
+            zeros_with_cache(layer->weights, layer->input_dims, layer->output_dims);
+            zeros_with_cache(layer->biases, 1, layer->output_dims);
             random_normal(layer->weights, 0.0, 0.1);
             input_dims = layer->output_dims;
         }
@@ -452,8 +517,8 @@ void compile_model(FFModel model[1], int feature_dims, int batch_size)
             abs_layer->output_dims = input_dims;
         }
 
-        zeros(&pred_caches[i], batch_size, abs_layer->output_dims);
-        zeros(&delta_caches[i], batch_size, abs_layer->output_dims);
+        zeros_with_cache(&pred_caches[i], batch_size, abs_layer->output_dims);
+        zeros_with_cache(&delta_caches[i], batch_size, abs_layer->output_dims);
     }
 
     model->tape = (FFLayerCache*)malloc(sizeof(FFLayerCache) * model->num_layers);
@@ -466,7 +531,7 @@ void compile_model(FFModel model[1], int feature_dims, int batch_size)
             DenseLayer* layer = (DenseLayer*)abs_layer;
             size_t num_params = layer->weights->num_rows * layer->weights->num_cols
                 + layer->biases->num_cols;
-            zeros(&grads, 1, num_params);
+            zeros_with_cache(&grads, 1, num_params);
         }
 
         /* info: input features and loss deltas are external matrices */
@@ -667,8 +732,12 @@ void training(
     int num_train_examples = (int)(features->num_rows * train_split);
     int num_train_batches = num_train_examples / batch_size;
     int num_test_batches = (features->num_rows - num_train_examples) / batch_size;
-    Matrix2D batch_x = (Matrix2D){batch_size, features->num_cols, features->data};
-    Matrix2D batch_y = (Matrix2D){batch_size, labels->num_cols, labels->data};
+
+    Matrix2D features_cache[1], labels_cache[1];
+    zeros(features_cache, batch_size, features->num_cols);
+    zeros(labels_cache, batch_size, labels->num_cols);
+    Matrix2D batch_x = (Matrix2D){batch_size, features->num_cols, features->data, features_cache->data};
+    Matrix2D batch_y = (Matrix2D){batch_size, labels->num_cols, labels->data, labels_cache->data};
 
     int train_perm[num_train_batches];
     for (int i = 0; i < num_train_batches; i++)
@@ -699,4 +768,7 @@ void training(
         }
         printf("epoch %d, loss=%f\n", epoch, loss / num_test_batches);
     }
+
+    free_matrix(features_cache);
+    free_matrix(labels_cache);
 }
