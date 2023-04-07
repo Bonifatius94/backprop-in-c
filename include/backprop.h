@@ -406,13 +406,13 @@ void dense_unpack_grads(const DenseLayer layer[1], const Matrix2D flat_grads[1],
     grads[1] = (Matrix2D){1, layer->output_dims, flat_grads->data + offset};
 }
 
-void dense_forward(const DenseLayer layer[1], const FFLayerCache cache[1])
+void dense_forward(const DenseLayer layer[1], FFLayerCache cache[1])
 {
     matmul(cache->inputs, layer->weights, cache->outputs, MATMUL_NN);
     batch_rowadd(cache->outputs, layer->biases, cache->outputs);
 }
 
-void dense_backward(const DenseLayer layer[1], const FFLayerCache cache[1])
+void dense_backward(const DenseLayer layer[1], FFLayerCache cache[1])
 {
     Matrix2D dense_grads[2];
     dense_unpack_grads(layer, cache->gradients, dense_grads);
