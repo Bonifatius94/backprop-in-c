@@ -20,12 +20,13 @@ is not only good for the climate but also for our AWS bills.
 ## Quickstart
 
 ```sh
-git clone https://github.com/Bonifatius94/backprop-in-c
+sudo apt-get update && \
+    sudo apt-get install -y build-essential cmake
 ```
 
 ```sh
-sudo apt-get update && \
-    sudo apt-get install -y build-essential cmake
+git clone https://github.com/Bonifatius94/backprop-in-c
+cd backprop-in-c
 ```
 
 ```sh

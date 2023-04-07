@@ -1,6 +1,9 @@
 from timeit import timeit
 import numpy as np
 
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 from tensorflow import keras
 from keras import Sequential, Model
 from keras.layers import Dense

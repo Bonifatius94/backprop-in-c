@@ -222,7 +222,7 @@ def train(
             model.update(grads)
 
         test_pred = model.forward(x_test)
-        print(f"epoch {epoch}, loss {loss.loss(test_pred, y_test)}", end="\r")
+        print(f"epoch {epoch}, loss {loss.loss(test_pred, y_test)}")
 
 
 def partition_dataset(x: np.ndarray, y: np.ndarray) -> DatasetSplits:
