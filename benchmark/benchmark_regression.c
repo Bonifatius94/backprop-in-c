@@ -83,7 +83,7 @@ int main(int argc, char** argv)
         train_benchmark(features, labels);
     end = clock();
     cpu_time_in_secs = ((double) (end - start)) / CLOCKS_PER_SEC / repetitions;
-    printf("time per training: %f s\n", cpu_time_in_secs);
+    printf("time per training: %.2f s\n", cpu_time_in_secs);
 
     free_matrix(features);
     free_matrix(labels);
