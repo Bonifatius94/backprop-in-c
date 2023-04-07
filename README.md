@@ -40,3 +40,20 @@ cd backprop-in-c
 ```sh
 ./benchmark.sh
 ```
+
+## Benchmark Results
+
+```text
+=====================================
+              BENCHMARK
+=====================================
+reference implementation 'backprop'
+time per training: 0.35 s
+=====================================
+tensorflow implementation
+time per training: 2.08 s
+=====================================
+numpy implementation
+time per training: 0.61 s
+=====================================
+```
