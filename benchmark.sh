@@ -16,21 +16,21 @@ echo "====================================="
 echo "              BENCHMARK              "
 echo "====================================="
 
-pushd build/benchmark > /dev/null
+pushd build/benchmark/regression > /dev/null
     echo "reference implementation 'backprop'"
     ./benchmark_regression | tail -n 1
 popd > /dev/null
 
 echo "====================================="
 
-pushd benchmark > /dev/null
+pushd benchmark/regression > /dev/null
     echo "tensorflow implementation"
     python3 tf_regression.py | tail -n 1
 popd > /dev/null
 
 echo "====================================="
 
-pushd benchmark > /dev/null
+pushd benchmark/regression > /dev/null
     echo "numpy implementation"
     python3 np_regression.py | tail -n 1
 popd > /dev/null
