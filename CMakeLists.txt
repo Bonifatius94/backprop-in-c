@@ -15,4 +15,5 @@ add_test(NAME MatrixTests COMMAND MatrixTests)
 add_test(NAME ModelTests COMMAND ModelTests)
 
 add_subdirectory(regression)
+add_subdirectory(classification)
 add_subdirectory(benchmark)

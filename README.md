@@ -34,7 +34,8 @@ cd backprop-in-c
 ```
 
 ```sh
-./train.sh
+./train_regression.sh
+./train_classification.sh
 ```
 
 ```sh

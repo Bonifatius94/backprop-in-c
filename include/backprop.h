@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "matrix_ops.h"
 
+#pragma once
+
 /* ========================= */
 /*      NEURAL NETWORK       */
 /* ========================= */
@@ -326,6 +328,8 @@ typedef struct Dataset {
     Matrix2D test_y[1];
 } Dataset;
 
+typedef void (*loss_logger)(int, double);
+
 double mse_loss(const Matrix2D y_pred[1], const Matrix2D y_true[1])
 {
     assert(y_true->num_rows == y_pred->num_rows);
@@ -373,8 +377,6 @@ void shuffle_dataset(Matrix2D x[1], Matrix2D y[1])
     shuffle_rows(y, perm);
 }
 
-typedef void (*loss_logger)(int, double);
-
 void training(
     FFModel model[1], Dataset ds[1],
     int num_epochs, int batch_size, double learn_rate,
@@ -383,10 +385,12 @@ void training(
     assert(ds->train_x->num_rows == ds->train_y->num_rows);
     assert(ds->test_x->num_rows == ds->test_y->num_rows);
 
-    int num_train_batches = ds->train_x->num_rows / batch_size;
-    int num_test_batches = ds->test_x->num_rows / batch_size;
+    int num_train_examples = ds->train_x->num_rows;
+    int num_test_examples = ds->test_x->num_rows;
     int input_dims = ds->train_x->num_cols;
     int output_dims = ds->train_y->num_cols;
+    int num_train_batches = num_train_examples / batch_size;
+    int num_test_batches = num_test_examples / batch_size;
 
     Matrix2D features_cache[1], labels_cache[1];
     zeros(features_cache, batch_size, input_dims);

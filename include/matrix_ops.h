@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <immintrin.h>
 
+#pragma once
+
 // #define MATMUL_AVX512 1
 #define MATMUL_AVX256 1
 
@@ -404,7 +406,7 @@ void batch_geq(const Matrix2D a1[1], double min, Matrix2D res[1])
 /* Shuffle the rows according to the given permutation (in-place). */
 void shuffle_rows(Matrix2D a1[1], const int perm[])
 {
-    double temp_data[a1->num_rows * a1->num_cols];
+    double* temp_data = (double*)malloc(a1->num_rows * a1->num_cols * sizeof(double));
 
     for (int i = 0; i < a1->num_rows; i++)
         for (int j = 0; j < a1->num_cols; j++)
@@ -413,6 +415,8 @@ void shuffle_rows(Matrix2D a1[1], const int perm[])
     for (int i = 0; i < a1->num_rows; i++)
         for (int j = 0; j < a1->num_cols; j++)
             a1->data[i * a1->num_cols + j] = temp_data[i * a1->num_cols + j];
+
+    free(temp_data);
 }
 
 /* Free the data managed by the matrix. */
