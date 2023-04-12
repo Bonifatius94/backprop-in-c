@@ -2,22 +2,44 @@
 #include <time.h>
 #include "backprop.h"
 
-void create_dataset(Matrix2D features[1], Matrix2D labels[1])
+void create_dataset(Dataset ds[1])
 {
     double min_x = -10.0, max_x = 10.0;
     int n_examples = 10000;
-    double step = (max_x - min_x) / n_examples;
+    double train_split = 0.8;
 
-    zeros(features, n_examples, 1);
-    zeros(labels, n_examples, 1);
+    double x_range = max_x - min_x;
+    int num_train_examples = (int)(n_examples * train_split);
+    int num_test_examples = n_examples - num_train_examples;
 
-    for (int i = 0; i < n_examples; i++)
+    zeros(ds->train_x, num_train_examples, 1);
+    zeros(ds->train_y, num_train_examples, 1);
+    zeros(ds->test_x, num_test_examples, 1);
+    zeros(ds->test_y, num_test_examples, 1);
+
+    for (int i = 0; i < num_train_examples; i++)
     {
-        double x = (i - (n_examples / 2)) * step;
+        double x = random_uniform_double() * x_range + min_x;
         double y = sin(x);
-        features->data[i] = x;
-        labels->data[i] = y;
+        ds->train_x->data[i] = x;
+        ds->train_y->data[i] = y;
     }
+
+    for (int i = 0; i < num_test_examples; i++)
+    {
+        double x = random_uniform_double() * x_range + min_x;
+        double y = sin(x);
+        ds->test_x->data[i] = x;
+        ds->test_y->data[i] = y;
+    }
+}
+
+void free_dataset(Dataset ds[1])
+{
+    free_matrix(ds->train_x);
+    free_matrix(ds->train_y);
+    free_matrix(ds->test_x);
+    free_matrix(ds->test_y);
 }
 
 void create_model(FFModel model[1])
@@ -43,24 +65,28 @@ void create_model(FFModel model[1])
     model->layers[4] = (AbstractLayer*)fcc_2;
 }
 
-void train_benchmark(Matrix2D features[1], Matrix2D labels[1])
+void log_loss(int epoch, double loss)
+{
+    printf("epoch %d, loss=%f\n", epoch, loss);
+}
+
+void train_benchmark(Dataset dataset[1])
 {
     FFModel model[1];
     create_model(model);
 
     int batch_size = 64;
-    compile_model(model, features->num_cols, batch_size);
+    compile_model(model, dataset->train_x->num_cols, batch_size);
 
     AdamCache opt_cache[1];
     compile_adam(model, opt_cache, true);
 
     int num_epochs = 10;
-    double train_split = 0.8;
     double learn_rate = 0.01;
     training(
-        model, features, labels, num_epochs,
-        batch_size, learn_rate, train_split,
-        ADAM, opt_cache);
+        model, dataset, num_epochs,
+        batch_size, learn_rate,
+        ADAM, opt_cache, &log_loss);
 
     free_adam(opt_cache);
     free_model(model);
@@ -70,9 +96,8 @@ int main(int argc, char** argv)
 {
     srand(time(NULL));
 
-    Matrix2D features[1];
-    Matrix2D labels[1];
-    create_dataset(features, labels);
+    Dataset dataset[1];
+    create_dataset(dataset);
 
     int repetitions = 10;
     clock_t start, end;
@@ -80,13 +105,12 @@ int main(int argc, char** argv)
 
     start = clock();
     for (int i = 0; i < repetitions; i++)
-        train_benchmark(features, labels);
+        train_benchmark(dataset);
     end = clock();
     cpu_time_in_secs = ((double) (end - start)) / CLOCKS_PER_SEC / repetitions;
     printf("time per training: %.2f s\n", cpu_time_in_secs);
 
-    free_matrix(features);
-    free_matrix(labels);
+    free_dataset(dataset);
 
     return 0;
 }
